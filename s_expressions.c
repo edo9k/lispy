@@ -37,7 +37,7 @@ typedef struct lval {
 
 /* number type lval */
 lval* lval_num(long x) {
-  lval v = malloc(sizeof(lval));
+  lval* v = malloc(sizeof(lval));
   v->type = LVAL_NUM;
   v->num = x;
   return v;
@@ -47,7 +47,7 @@ lval* lval_num(long x) {
 lval* lval_err(char* m) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_ERR;
-  v->err = malloc(strlen(m)) + 1);
+  v->err = malloc(strlen(m)) + 1;
   strcpy(v->err, m);
   return v;
 }
@@ -143,18 +143,18 @@ void lval_expr_print(lval* v, char open, char close) {
 
 /* print an lval */
 void lval_print(lval* v){
-  switch(v.type) {
-    case LVAL_NUM: printf("%li", v.num); break;
+  switch(v->type) {
+    case LVAL_NUM: printf("%li", v->num); break;
     case LVAL_ERR: printf("Error: %s", v->err); break;
-    case LVAL_SYM: printf("%s", v->sym,); break;
-    case LVAL_SEXPR: lval_expr_print(v '(',')'); break; 
+    case LVAL_SYM: printf("%s", v->sym); break;
+    case LVAL_SEXPR: lval_expr_print(v, '(',')'); break; 
   }
 }
 
 /* print lval with newline */
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
-lval* bultin_op(lval* a, char* op) {
+lval* builtin_op(lval* a, char* op) {
   /* check if all elements are numbers */
   for (int i = 0; i < a->count; i++) {
     if(a->cell[i]->type != LVAL_NUM) {
@@ -228,7 +228,7 @@ lval* lval_eval_sexpr(lval* v) {
   /* call builtin with operator */
   lval* result = builtin_op(v, f->sym);
   lval_del(f);
-  return results;
+  return result;
 }
 
 lval* lval_eval(lval* v) {
@@ -250,47 +250,50 @@ lval* lval_read(mpc_ast_t* t) {
 
   /* if symbol or number return converions to that type */
   if (strstr(t->tag, "number")) { return lval_read_num(t); }
-  if (strstr(t->tag, "symbol")) { return lval_sum(t->contents); }
+  if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
 
   /* if root or sexpr, create empty list */
   lval* x = NULL;
-  if (strcmp(t->tag, ">") == 0) { x = lval_sexpr();
-  if (strstr(t->tag, "sexpr")) { x = lval_sexpr()
+  if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); };
+  if (strstr(t->tag, "sexpr"))  { x = lval_sexpr(); };
 
   for (int i = 0; i < t->children_num; i++) {
     if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
     if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
-    if (strcmp(t->childrení]->tag, "regex") == 0) { continue; }
+    if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
     x = lval_add(x, lval_read(t->children[i]));
+  }
 
+  return x;
 }
 
-/* check string and perform operation */
+/* check string and perform operation 
  lval eval_op(lval x, char* op, lval y){
 
-  /* return error if there's one */
+  // return error if there's one 
   if (x.type == LVAL_ERR) { return x; }
   if (y.type == LVAL_ERR) { return y; }
 
-  /* otherwise do the maths and shit */
+  /// otherwise do the maths and shit 
   if (strcmp(op, "+") == 0) { return lval_num(x.num + y.num); }
   if (strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }
   if (strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
   if (strcmp(op, "/") == 0) { 
-    /* guard divisions by zero */
+    // guard divisions by zero 
     return y.num == 0
       ? lval_err(LERR_DIV_ZERO)
       : lval_num(x.num / y.num);
   }
 
   return lval_err(LERR_BAD_OP);
-}
+} */
 
 int main(int argc, char** argv) {
 
   /* parsers */
   mpc_parser_t* Number   = mpc_new("number");
-  mpc_parser_t* Operator = mpc_new("operator");
+  mpc_parser_t* Symbol   = mpc_new("symbol");
+  mpc_parser_t* Sexpr    = mpc_new("sexpr");
   mpc_parser_t* Expr     = mpc_new("expr");
   mpc_parser_t* Lispy    = mpc_new("lispy");
 
