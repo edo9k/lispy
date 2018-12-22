@@ -1,6 +1,6 @@
 #include "mpc.h"
 
-#ifdef _WIN32_
+#ifdef _WIN32
 
 static char buffer[2048];
 
@@ -224,8 +224,8 @@ lval* lval_join(lval* x, lval* y) {
 
 lval* lval_pop(lval* v, int i) {
   lval* x = v->cell[i];
-  memmove(&v->cell[i], &v->cell[i + 1],
-      sizeof(lval*) * (v->count - i - 1));
+  memmove(&v->cell[i], 
+      &v->cell[i + 1], sizeof(lval*) * (v->count - i - 1));
   v->count--;
   v->cell = realloc(v->cell, sizeof(lval*) * v->count);
   return x;
@@ -405,7 +405,7 @@ void lenv_def(lenv* e, lval* k, lval* v) {
   LASSERT(args, args->cell[index]->count != 0, \
       "Function '%s' passed {} for argument %i.", func, index);
 
-lval* lval_eval(lenv*, lval* v);
+lval* lval_eval(lenv* e, lval* v);
 
 lval* builtin_list(lenv* e, lval* a) {
   a->type = LVAL_QEXPR;
@@ -699,7 +699,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
   }
 
   if (v->count == 0) { return v; }
-  if (v->count == 1) {return lval_take(v, 0); }
+  if (v->count == 1) {return lval_eval(e, lval_take(v, 0)); }
 
   /* ensure first element is a func after evaluation */
   lval* f = lval_pop(v, 0);
