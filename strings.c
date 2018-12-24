@@ -24,7 +24,7 @@ void add_history(char* unused) {}
 mpc_parser_t* Number;
 mpc_parser_t* Symbol;
 mpc_parser_t* String;
-mpc_parser_t* Comments;
+mpc_parser_t* Comment;
 mpc_parser_t* Sexpr;
 mpc_parser_t* Qexpr;
 mpc_parser_t* Expr;
@@ -731,6 +731,75 @@ lval* builtin_lambda(lenv* e, lval* a) {
   return lval_lambda(formals, body);
 }
 
+lval* lval_read(mpc_ast_t* t);
+
+lval* builtin_load(lenv* e, lval* a) {
+  LASSERT_NUM("load", a, 1);
+  LASSERT_TYPE("load", a, 0, LVAL_STR);
+
+  /* parse file given by string name */
+  mpc_result_t r;
+
+  if(mpc_parse_contents(a->cell[0]->str, Lispy, &r)) {
+    /* read contents */
+    lval* expr = lval_read(r.output);
+    mpc_ast_delete(r.output);
+
+    /* valuate each expression */
+    while (expr->count) {
+      lval* x = lval_eval(e, lval_pop(expr, 0));
+      /* if error, print it */
+      if(x->type == LVAL_ERR) { lval_println(x); }
+      lval_del(x);
+    }
+
+    /* delete expressions and arguments */
+    lval_del(expr);
+    lval_del(a);
+
+    /* return empty list */
+    return lval_sexpr();
+  } else {
+    /* get parse error as string */
+    char* err_msg = mpc_err_string(r.error);
+    mpc_err_delete(r.error);
+
+    /* create new error message */
+    lval* err = lval_err("Could not load Library %s", err_msg);
+    free(err_msg);
+    lval_del(a);
+
+    /* cleanup and return error */
+    return err;
+  }
+
+}
+
+lval* builtin_print(lenv* e, lval* a) {
+  /* print each argument with traling space */
+  for (int i = 0; i < a->count; i++) {
+    lval_print(a->cell[i]); putchar(' ');
+  }
+
+  /* print newline and delete args */
+  putchar('\n');
+  lval_del(a);
+
+  return lval_sexpr();
+}
+
+lval* builtin_error(lenv* e, lval* a) {
+  LASSERT_NUM("error", a, 1);
+  LASSERT_TYPE("error", a, 0, LVAL_STR);
+
+  /* construct error from first arg */
+  lval* err = lval_err(a->cell[0]->str);
+
+  /* delete args and return */
+  lval_del(a);
+  return err;
+}
+
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
   lval* k = lval_sym(name);
   lval* v = lval_builtin(func);
@@ -740,9 +809,9 @@ void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
 
 void lenv_add_builtins(lenv* e) {
   /* variable functions */
-  lenv_add_builtin(e, "\\", builtin_lambda);
+  lenv_add_builtin(e, "\\",  builtin_lambda);
   lenv_add_builtin(e, "def", builtin_def);
-  lenv_add_builtin(e, "=", builtin_put);
+  lenv_add_builtin(e, "=",   builtin_put);
 
   /* list functions */
   lenv_add_builtin(e, "list", builtin_list);
@@ -765,6 +834,11 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "<",  builtin_lt);
   lenv_add_builtin(e, ">=", builtin_ge);
   lenv_add_builtin(e, "<=", builtin_le);
+
+  /* string functions */
+  lenv_add_builtin(e, "load",  builtin_load);
+  lenv_add_builtin(e, "error", builtin_error);
+  lenv_add_builtin(e, "print", builtin_print);
 }
 
 /* evaluation */
@@ -952,12 +1026,14 @@ lval* lval_read(mpc_ast_t* t) {
 
 int main(int argc, char** argv) {
 
-  mpc_parser_t* Number  = mpc_new("number");
-  mpc_parser_t* Symbol  = mpc_new("symbol");
-  mpc_parser_t* Sexpr   = mpc_new("sexpr");
-  mpc_parser_t* Qexpr   = mpc_new("qexpr");
-  mpc_parser_t* Expr    = mpc_new("expr");
-  mpc_parser_t* Lispy   = mpc_new("lispy");
+  Number  = mpc_new("number");
+  Symbol  = mpc_new("symbol");
+  String  = mpc_new("string");
+  Comment = mpc_new("comment");
+  Sexpr   = mpc_new("sexpr");
+  Qexpr   = mpc_new("qexpr");
+  Expr    = mpc_new("expr");
+  Lispy   = mpc_new("lispy");
 
   mpca_lang(MPCA_LANG_DEFAULT, 
       "                                                     \
@@ -972,29 +1048,51 @@ int main(int argc, char** argv) {
       ",
       Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Lispy);
 
-  puts("Lispy Version 0.0.0.0.9");
-  puts("Press Ctrl+c to Exit\n");
 
   lenv* e = lenv_new();
   lenv_add_builtins(e);
 
-  while (1) {
-    
-    char* input = readline("lispy> ");
-    add_history(input);
+  /* interactive prompt */
+  if (argc == 1) {
 
-    mpc_result_t r;
-    if (mpc_parse("<stdin>", input, Lispy, &r)) {
-      lval* x = lval_eval(e, lval_read(r.output));
-      lval_println(x);
-      lval_del(x);
-      mpc_ast_delete(r.output);
-    } else {
-      mpc_err_print(r.error);
-      mpc_err_delete(r.error);
+    puts("Lispy Version 0.0.0.1.0");
+    puts("Press Ctrl+c to Exit\n");
+
+    while (1) {
+      
+      char* input = readline("lispy> ");
+      add_history(input);
+
+      mpc_result_t r;
+      if (mpc_parse("<stdin>", input, Lispy, &r)) {
+        lval* x = lval_eval(e, lval_read(r.output));
+        lval_println(x);
+        lval_del(x);
+        mpc_ast_delete(r.output);
+      } else {
+        mpc_err_print(r.error);
+        mpc_err_delete(r.error);
+      }
+
+      free(input);
     }
+  }
 
-    free(input);
+  /* supplied with list of files */
+  if (argc >= 2) {
+
+    /* loop over each filename */
+    for (int i = 1; i < argc; i++) {
+      /* arg list with filename as single arg */
+      lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+
+      /* pass to builtin load and get result */
+      lval* x = builtin_load(e, args);
+
+      /* print if result is error */
+      if (x->type == LVAL_ERR) { lval_println(x); }
+      lval_del(x);      
+    }
   }
 
   lenv_del(e);
