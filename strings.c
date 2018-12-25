@@ -1036,15 +1036,16 @@ int main(int argc, char** argv) {
   Lispy   = mpc_new("lispy");
 
   mpca_lang(MPCA_LANG_DEFAULT, 
-      "                                                     \
-        number  : /-?[0-9]+/ ;                              \
-        symbol  : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;        \
-        string  : /\"(\\\\.|[^\"])*\"/ ;                    \
-        comment : /;[^\\r\\n]*/ ;                           \
-        sexpr   : '(' <expr>* ')' ;                         \
-        qexpr   : '{' <expr>* '}' ;                         \
-        expr    : <number> | <symbol> | <sexpr> | <qexpr> ; \
-        lispy   : /^/ <expr>* /$/ ;                         \
+      "                                              \
+        number  : /-?[0-9]+/ ;                       \
+        symbol  : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ; \
+        string  : /\"(\\\\.|[^\"])*\"/ ;             \
+        comment : /;[^\\r\\n]*/ ;                    \
+        sexpr   : '(' <expr>* ')' ;                  \
+        qexpr   : '{' <expr>* '}' ;                  \
+        expr    : <number>  | <symbol> | <string>    \
+                | <comment> | <sexpr>  | <qexpr> ;   \
+        lispy   : /^/ <expr>* /$/ ;                  \
       ",
       Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Lispy);
 
